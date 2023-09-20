@@ -74,7 +74,7 @@ class IoU(Metric):
 
 
 class SegmentationModel(pl.LightningModule):
-    def __init__(self, in_channels=12, lr=1e-3):
+    def __init__(self, in_channels=3, lr=1e-3):
         super().__init__()
         self.segmentation_model = smp.DeepLabV3Plus(in_channels=in_channels, activation='sigmoid')
         self.loss = nn.BCELoss()
