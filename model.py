@@ -1,42 +1,62 @@
 from typing import Any, Callable, Optional
-import pytorch_lightning as pl
-import segmentation_models_pytorch as smp
+# import pytorch_lightning as pl
+# import segmentation_models_pytorch as smp
+# import torch
+# import torch.nn as nn
+# from torch.utils.data import TensorDataset, DataLoader, Dataset
+# import numpy as np
+# from pytorch_lightning.loggers import CSVLogger
+# from dataset_utils import get_folds, np_to_torch
+# from torchmetrics import Metric
+from torchvision.datasets import VisionDataset, Dataset
 import torch
-import torch.nn as nn
-from torch.utils.data import TensorDataset, DataLoader, Dataset
+
+import os
+import pandas as pd
+import geopandas as gp
 import numpy as np
-from pytorch_lightning.loggers import CSVLogger
-from dataset_utils import get_folds, np_to_torch
-from torchmetrics import Metric
-from torchvision.datasets import VisionDataset
+from torchvision.transforms import ToTensor
+import rasterio
+
+from lightning.pytorch import Trainer
+from torch.utils.data import DataLoader
+from torchgeo.samplers import RandomGeoSampler
+from torchgeo.trainers import SemanticSegmentationTask
+
+from utils import get_labels_datasets
 
 BATCH_SIZE = 32
 NUM_WORKERS = 16
 torch.set_float32_matmul_precision('medium')
 
+# the label dataset provided should be the one built using get_labels_datasets function in utils.py
+# img_dir can alternatively be '/data1/malto/train' or '/data1/malto/test'
 
-class SatelliteDataset(VisionDataset):
-    def __init__(
-            self,
-            dataset, 
-            root = None, 
-            transforms = None, 
-            transform = None, 
-            target_transform = None
-    ) -> None:
-        super().__init__(root, transforms, transform, target_transform)
-        self.dataset = dataset
+class SigspatialDataset(Dataset):
+    def __init__(self, labels_dataset, img_dir, transform=ToTensor(), target_transform=None):
+        self.img_labels = labels_dataset
+        self.img_dir = img_dir
+        self.transform = transform
+        self.target_transform = target_transform
 
-    def __getitem__(self, index: int) -> Any:
-        if self.transform is not None:
-            return self.transform(self.dataset[index])
-        else:
-            return self.dataset[index]
-    
     def __len__(self):
-        return len(self.dataset)
+        return len(self.img_labels)
 
+    def __getitem__(self, idx, train = True):
+        if train:
+            img_path = f'train_img{idx+1}.tif'
+        else:
+            img_path = f'test_img{idx+1}.tif'
+        img = rasterio.open(img_path)
+        img_array = img.read()
+        label = self.img_labels[self.img_labels.Img_number == idx+1]
+        if self.transform:
+            image = self.transform(img_array)
+        if self.target_transform:
+            label = self.target_transform(label)
+        return image, label
 
+# TO DO!!!!!
 class IoU(Metric):
     def __init__(self):
         super().__init__()
@@ -117,8 +137,8 @@ class SatelliteDataModule(pl.LightningDataModule):
         else: 
             raise NotImplementedError
         
-        self.train_dataset = SatelliteDataset(TensorDataset(np_to_torch(train), np_to_torch(train_masks)))
-        self.val_dataset = SatelliteDataset(TensorDataset(np_to_torch(val), np_to_torch(val_masks)))
+        self.train_dataset = sigspatialDataset(TensorDataset(np_to_torch(train), np_to_torch(train_masks)))
+        self.val_dataset = sigspatialDataset(TensorDataset(np_to_torch(val), np_to_torch(val_masks)))
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS)
