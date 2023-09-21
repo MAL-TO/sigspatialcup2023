@@ -1,3 +1,4 @@
 downloads/
 .venv/
 *.tif
+**/__pycache__
