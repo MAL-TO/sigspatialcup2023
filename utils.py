@@ -4,6 +4,8 @@ import numpy as np
 from matplotlib import pyplot
 import rasterio
 from rasterio.plot import show
+import shapely
+from typing import List
 from rasterio.features import geometry_mask
 import rasterio.mask
 
@@ -80,3 +82,15 @@ def divide_tif_into_regions(tif_file_paths, regions_file_path):
             output_filename = f'img{j}_region_{i+1}.tif'
             with rasterio.open(output_filename, "w", **out_meta) as dest:
                 dest.write(out_image)
+
+def get_squares(rectangle: gp.GeoSeries, num_points=10, dim=224) -> List[shapely.Polygon]:
+    l = []
+    for i in range(num_points):
+        A = rectangle.sample_points(1)
+        B = A.translate(xoff=dim, yoff=0.0, zoff=0.0)
+        C = A.translate(xoff=dim, yoff=dim, zoff=0.0)
+        D = A.translate(xoff=0.0, yoff=dim, zoff=0.0)
+
+        l.append(shapely.Polygon((A[0], B[0], C[0], D[0])))
+    return l
+
