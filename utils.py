@@ -1,46 +1,38 @@
 import pandas as pd
 import geopandas as gp
 import numpy as np
+import pathlib.Path as Path
 from matplotlib import pyplot
 import rasterio
 from rasterio.plot import show
 import shapely
 from typing import List
+import affine
 from rasterio.features import geometry_mask
 import rasterio.mask
 
-def get_labels_datasets(self):
+def get_train_test_images():
     images_namelist = ["Greenland26X_22W_Sentinel2_2019-06-03_05.tif", "Greenland26X_22W_Sentinel2_2019-06-19_20.tif", "Greenland26X_22W_Sentinel2_2019-07-31_25.tif",  "Greenland26X_22W_Sentinel2_2019-08-25_29.tif"]
-    train_labels = gp.GeoDataFrame()
-    test_labels = gp.GeoDataFrame()
-    counter_train = 1
-    counter_test = 1
     # pd.concat([train_labels, lbl_reg1_img1])
+    test_folder = Path("test")
+    train_folder = Path("train")
+    
+    regions_file_path = "/data1/malto/sigspatial/lake_polygons_training.gpkg"
     for j in range(4):
         for i in range(6):
-            lbls = self.img_labels[self.img_labels.region_num == i]
-            lbls = lbls[self.img_labels.image == images_namelist[j]]
             if i%2 == 0 & j%2 == 0:
-                img_num = counter_test*np.ones(len(lbls), dtype=np.int8)
-                lbls['Img_number'] = img_num
-                counter_test += 1
-                test_labels = pd.concat([test_labels, lbls])
+                new_img_name = test_folder / f'{images_namelist[j]}_region_{i+1}.tif'
+                divide_tif_into_regions(images_namelist[j], regions_file_path, new_img_name)
             if i%2 == 0 & j%2 == 1:
-                img_num = counter_train*np.ones(len(lbls), dtype=np.int8)
-                lbls['Img_number'] = img_num
-                counter_train += 1
-                train_labels = pd.concat([train_labels, lbls])
+                new_img_name = train_folder / f'{images_namelist[j]}_region_{i+1}.tif'
+                divide_tif_into_regions(images_namelist[j], regions_file_path, new_img_name)
             if i%2 == 1 & j%2 == 0:
-                img_num = counter_train*np.ones(len(lbls), dtype=np.int8)
-                lbls['Img_number'] = img_num
-                counter_train += 1
-                train_labels = pd.concat([train_labels, lbls])
+                new_img_name = train_folder / f'{images_namelist[j]}_region_{i+1}.tif'
+                divide_tif_into_regions(images_namelist[j], regions_file_path, new_img_name)
             if i%2 == 1 & j%2 == 1:
-                img_num = counter_test*np.ones(len(lbls), dtype=np.int8)
-                lbls['Img_number'] = img_num
-                counter_test += 1
-                test_labels = pd.concat([test_labels, lbls])
-    return train_labels, test_labels
+                new_img_name = test_folder / f'{images_namelist[j]}_region_{i+1}.tif'
+                divide_tif_into_regions(images_namelist[j], regions_file_path, new_img_name)
+    return None
 
 def plot_image(image_path):
     pyplot.clf()
@@ -58,8 +50,21 @@ def from_tif_to_tensor(image_path):
     print(torch_image.shape)
     return torch_image
 
+def save_as_tif(out_image: np.ndarray, out_transform: affine.Affine, src: rasterio.io.DatasetReader, new_img_path: Path):
+    out_meta = src.meta
 
-def divide_tif_into_regions(tif_file_paths, regions_file_path):
+    # Update the metadata for the output file
+    out_meta.update({"driver": "GTiff",
+                "height": out_image.shape[1],
+                "width": out_image.shape[2],
+                "transform": out_transform})
+
+    # Save the clipped image to a new .tif file
+    output_filename = new_img_path
+    with rasterio.open(output_filename, "w", **out_meta) as dest:
+        dest.write(out_image)
+
+def divide_tif_into_regions(tif_file_paths, regions_file_path, new_img_path: Path):
     regions = gp.read_file(regions_file_path)
     for j in range(4):
         src = rasterio.open(tif_file_paths[j])
@@ -70,27 +75,48 @@ def divide_tif_into_regions(tif_file_paths, regions_file_path):
 
             # Mask the image using the region's geometry
             out_image, out_transform = rasterio.mask.mask(src, [region_geometry], crop=True)
-            out_meta = src.meta
+            save_as_tif(out_image, out_transform, src, new_img_path)
+            
 
-            # Update the metadata for the output file
-            out_meta.update({"driver": "GTiff",
-                        "height": out_image.shape[1],
-                        "width": out_image.shape[2],
-                        "transform": out_transform})
+def get_square(rectangle: gp.geoseries.GeoSeries, dim=100000) -> shapely.Polygon:
+    
+    A = rectangle.sample_points(1)
 
-            # Save the clipped image to a new .tif file
-            output_filename = f'img{j}_region_{i+1}.tif'
-            with rasterio.open(output_filename, "w", **out_meta) as dest:
-                dest.write(out_image)
+    B = A.translate(xoff=dim, yoff=0.0, zoff=0.0)
+    C = A.translate(xoff=dim, yoff=dim, zoff=0.0)
+    D = A.translate(xoff=0.0, yoff=dim, zoff=0.0)
+    return shapely.Polygon((A[0], B[0], C[0], D[0]))
 
-def get_squares(rectangle: gp.GeoSeries, num_points=10, dim=224) -> List[shapely.Polygon]:
-    l = []
-    for i in range(num_points):
-        A = rectangle.sample_points(1)
-        B = A.translate(xoff=dim, yoff=0.0, zoff=0.0)
-        C = A.translate(xoff=dim, yoff=dim, zoff=0.0)
-        D = A.translate(xoff=0.0, yoff=dim, zoff=0.0)
+def get_external_rectangle(regions: gp.geoseries.GeoDataFrame, num_region: int) -> gp.geoseries.GeoSeries:
+    return gp.GeoSeries(regions.iloc[num_region][1].minimum_rotated_rectangle)
 
-        l.append(shapely.Polygon((A[0], B[0], C[0], D[0])))
-    return l
+def is_valid(image: np.ndarray):
+    # Sum the pixel values along the color channels (axis=2)
+    channel_sums = np.sum(image, axis=0)
+    print(channel_sums.min(), channel_sums.max())
+    # Check if all pixel sums are either 0 (black) or 255*3 (white)
+    return np.all((channel_sums > 0) & (channel_sums < 255 * 3))
 
+def get_valid_image(img_region_path: str, rectangle: gp.geoseries.GeoSeries) -> np.ndarray:
+    img_region = rasterio.open(img_region_path)
+    while True:
+        poly = get_square(rectangle)
+        out_image, _ = rasterio.mask.mask(img_region, [poly], crop=True)
+        if not is_valid(out_image):
+            continue
+        else:
+            break
+
+def generate_label(cropped_img_tiff_path: Path, lake_geom: gp.geoseries.GeoSeries):
+    """
+    lake_geom is lakes_regions[lakes_regions['region_num'] == 2]['geometry']
+    """
+    img_trial = rasterio.open(cropped_img_tiff_path)
+
+    out_image, out_transform = rasterio.mask.mask(img_trial, lake_geom)
+    out_image = out_image.sum(axis=0)
+    out_image[out_image != 0] = 1
+
+    new_img_path = "label" / cropped_img_tiff_path
+
+    save_as_tif(out_image, out_transform, img_trial, new_img_path)
