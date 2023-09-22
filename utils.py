@@ -6,7 +6,7 @@ from matplotlib import pyplot
 import rasterio
 from rasterio.plot import show
 import shapely
-from typing import List
+from typing import List, Tuple
 import affine
 from rasterio.features import geometry_mask
 import rasterio.mask
@@ -106,9 +106,15 @@ def get_valid_image(img_region_path: str, rectangle: gp.GeoSeries) -> np.ndarray
         else:
             break
 
-def generate_label(cropped_img_tiff_path: Path, lake_geom: gp.GeoSeries):
+def get_image_and_region(img_tiff_path: str) -> Tuple(str, int):
+    split = img_tiff_path.split("_region_")
+    image = split[0]
+    region = int(split[-1].split(".")[0])
+    return image, region
+
+def generate_label(cropped_img_tiff_path: Path, lake_geom: gp.GeoSeries, out_image_path: Path):
     """
-    lake_geom is lakes_regions[lakes_regions['region_num'] == 2]['geometry']
+    lake_geom is lakes_regions[lakes_regions['region_num'] == 2 & lakes_region['image'] == image]['geometry']
     """
     img_trial = rasterio.open(cropped_img_tiff_path)
 
@@ -116,9 +122,9 @@ def generate_label(cropped_img_tiff_path: Path, lake_geom: gp.GeoSeries):
     out_image = out_image.sum(axis=0)
     out_image[out_image != 0] = 1
 
-    new_img_path = "label" / cropped_img_tiff_path
+    save_as_tif(out_image, out_transform, img_trial, out_image_path)
 
-    save_as_tif(out_image, out_transform, img_trial, new_img_path)
+
 
 if __name__ == "__main__":
     if not os.path.exists(IMG_DIR / "test"):
