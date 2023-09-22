@@ -15,12 +15,12 @@ import os
 IMG_DIR = Path("/data1/malto/sigspatial")
 
 def get_train_test_images():
-    images_namelist = [name for name in os.listdir(IMG_DIR) if name.split(".")[-1] == "tif"]
+    images_namelist = sorted([name for name in os.listdir(IMG_DIR) if name.split(".")[-1] == "tif"])
     # pd.concat([train_labels, lbl_reg1_img1])
     test_folder = IMG_DIR / "test"
     train_folder = IMG_DIR / "train"
     
-    regions_file_path = "/data1/malto/sigspatial/lake_polygons_training.gpkg"
+    regions_file_path = IMG_DIR / "lakes_regions.gpkg"
     regions = gp.read_file(regions_file_path)
 
     for j in range(4):

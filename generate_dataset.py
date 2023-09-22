@@ -1,9 +1,7 @@
 from utils import *
 import pathlib
 
-
 DIR = pathlib.Path("/data1/malto/sigspatial")
-
 
 if __name__ == "__main__":
     
@@ -13,4 +11,4 @@ if __name__ == "__main__":
     lakes_regions = gp.read_file(lakes_regions_path)
 
     for region in regions:
-        
+        pass
