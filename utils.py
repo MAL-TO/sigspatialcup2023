@@ -77,17 +77,20 @@ def divide_tif_into_regions(tif_file_path: Path, region_geometry: gp.GeoSeries, 
     save_as_tif(out_image, out_transform, src, new_img_path)
             
 
-def get_square(rectangle: gp.GeoSeries, dim=100000) -> shapely.Polygon:
+def get_square(x: int, y: int, dim: int=100000) -> shapely.Polygon:
     
-    A = rectangle.sample_points(1)
+    A = shapely.Point(x, y) 
+    B = shapely.Point(x + dim, y)
+    C = shapely.Point(x + dim, y + dim)
+    D = shapely.Point(x, y + dim)
 
-    B = A.translate(xoff=dim, yoff=0.0, zoff=0.0)
-    C = A.translate(xoff=dim, yoff=dim, zoff=0.0)
-    D = A.translate(xoff=0.0, yoff=dim, zoff=0.0)
-    return shapely.Polygon((A[0], B[0], C[0], D[0]))
+    return shapely.Polygon((A, B, C, D))
 
 def get_external_rectangle(regions: gp.GeoDataFrame, num_region: int) -> gp.GeoSeries:
-    return gp.GeoSeries(regions.iloc[num_region][1].minimum_rotated_rectangle)
+    """
+    The rectangle is parallel to the axes
+    """
+    return gp.GeoSeries(regions[regions['region_num'] == num_region]['geometry'].envelope)
 
 def is_valid(image: np.ndarray):
     # Sum the pixel values along the color channels (axis=2)
@@ -96,17 +99,13 @@ def is_valid(image: np.ndarray):
     # Check if all pixel sums are either 0 (black) or 255*3 (white)
     return np.all((channel_sums > 0) & (channel_sums < 255 * 3))
 
-def get_valid_image(img_region_path: str, rectangle: gp.GeoSeries) -> np.ndarray:
+def generate_image(img_region_path: Path, rectangle: gp.GeoSeries, out_file_path: Path):
     img_region = rasterio.open(img_region_path)
-    while True:
-        poly = get_square(rectangle)
-        out_image, _ = rasterio.mask.mask(img_region, [poly], crop=True)
-        if not is_valid(out_image):
-            continue
-        else:
-            break
+    out_image, out_transform = rasterio.mask.mask(img_region, [rectangle], crop=True)
+    save_as_tif(out_image, out_transform, img_region, out_file_path)
 
-def get_image_and_region(img_tiff_path: str) -> Tuple(str, int):
+
+def get_image_and_region(img_tiff_path: str) -> Tuple[str, int]:
     split = img_tiff_path.split("_region_")
     image = split[0]
     region = int(split[-1].split(".")[0])
@@ -119,8 +118,8 @@ def generate_label(cropped_img_tiff_path: Path, lake_geom: gp.GeoSeries, out_ima
     img_trial = rasterio.open(cropped_img_tiff_path)
 
     out_image, out_transform = rasterio.mask.mask(img_trial, lake_geom)
-    out_image = out_image.sum(axis=0)
-    out_image[out_image != 0] = 1
+    #out_image = out_image.sum(axis=0)
+    out_image[out_image != 0] = 255
 
     save_as_tif(out_image, out_transform, img_trial, out_image_path)
 

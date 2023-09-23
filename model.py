@@ -56,7 +56,6 @@ class SigspatialDataset(Dataset):
             label = self.target_transform(label)
         return image, label
 
-# TO DO!!!!!
 class IoU(Metric):
     def __init__(self):
         super().__init__()
