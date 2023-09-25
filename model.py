@@ -1,18 +1,19 @@
 from typing import Any, Callable, Optional
-# import pytorch_lightning as pl
-# import segmentation_models_pytorch as smp
-# import torch
-# import torch.nn as nn
-# from torch.utils.data import TensorDataset, DataLoader, Dataset
-# import numpy as np
-# from pytorch_lightning.loggers import CSVLogger
-# from dataset_utils import get_folds, np_to_torch
-# from torchmetrics import Metric
+import pytorch_lightning as pl
+import segmentation_models_pytorch as smp
+import torch
+import torch.nn as nn
+from torch.utils.data import TensorDataset, DataLoader, Dataset
+import numpy as np
+from pytorch_lightning.loggers import CSVLogger
+
+from torchmetrics import Metric
 from torchvision.datasets import VisionDataset, Dataset
 import torch
 
 import os
 import pandas as pd
+from pathlib import Path
 import geopandas as gp
 import numpy as np
 from torchvision.transforms import ToTensor
@@ -20,10 +21,6 @@ import rasterio
 
 from lightning.pytorch import Trainer
 from torch.utils.data import DataLoader
-from torchgeo.samplers import RandomGeoSampler
-from torchgeo.trainers import SemanticSegmentationTask
-
-from utils import get_labels_datasets
 
 BATCH_SIZE = 32
 NUM_WORKERS = 16
@@ -33,27 +30,36 @@ torch.set_float32_matmul_precision('medium')
 # img_dir can alternatively be '/data1/malto/train' or '/data1/malto/test'
 
 class SigspatialDataset(Dataset):
-    def __init__(self, labels_dataset, img_dir, transform=ToTensor(), target_transform=None ):
-        self.img_labels = labels_dataset
+    def __init__(self, img_dir: Path, transform=None, target_transform=None):
         self.img_dir = img_dir
         self.transform = transform
         self.target_transform = target_transform
-        self.images_namelist = sorted([name for name in os.listdir(img_dir) if name.split(".")[-1] == "tif"])
+        self.names = sorted([name for name in os.listdir(img_dir / "image") if name.split(".")[-1] == "tif"])
 
     def __len__(self):
         return len(self.img_labels)
 
     def __getitem__(self, idx):
-        
-        img_path = self.images_namelist
+        img_path = self.img_dir / "image" / self.names[idx]
+        lbl_path = self.img_dir / "label" / self.names[idx]
         img = rasterio.open(img_path)
+        lbl = rasterio.open(lbl_path)
         img_array = img.read()
-        label = self.img_labels[self.img_labels.Img_number == idx+1]
-        if self.transform:
-            image = self.transform(img_array)
-        if self.target_transform:
-            label = self.target_transform(label)
-        return image, label
+        lbl_array = lbl.read().mean(axis=0)
+
+        # transforms
+        img_array = np.transpose(img_array, ((1, 2, 0)))
+        lbl_array = np.transpose(lbl_array, ((1, 2, 0)))
+
+        img_tensor = ToTensor()(img_array)
+        lbl_tensor = ToTensor()(lbl_array)
+
+        if self.transform is not None:
+            img_tensor = self.transform(img_tensor)
+        if self.target_transform is not None:
+            lbl_tensor = self.target_transform(lbl_tensor)
+
+        return img_tensor, lbl_tensor
 
 class IoU(Metric):
     def __init__(self):
@@ -111,7 +117,7 @@ class SatelliteDataModule(pl.LightningDataModule):
         
         
     def prepare_data(self):
-        
+        pass
 
     def setup(self, stage=None):
         pass

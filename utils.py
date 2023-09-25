@@ -12,31 +12,31 @@ from rasterio.features import geometry_mask
 import rasterio.mask
 import os
 
-IMG_DIR = Path("/data1/malto/sigspatial")
+BASE_DIR = Path("/data1/malto/sigspatial")
 
 def get_train_test_images():
-    images_namelist = sorted([name for name in os.listdir(IMG_DIR) if name.split(".")[-1] == "tif"])
+    images_namelist = sorted([name for name in os.listdir(BASE_DIR) if name.split(".")[-1] == "tif"])
     # pd.concat([train_labels, lbl_reg1_img1])
-    test_folder = IMG_DIR / "test"
-    train_folder = IMG_DIR / "train"
+    test_folder = BASE_DIR / "test"
+    train_folder = BASE_DIR / "train"
     
-    regions_file_path = IMG_DIR / "lakes_regions.gpkg"
+    regions_file_path = BASE_DIR / "lakes_regions.gpkg"
     regions = gp.read_file(regions_file_path)
 
     for j in range(4):
         for i in range(6):
             if i % 2 == 0 and j % 2 == 0:
                 new_img_name = test_folder / f'{images_namelist[j]}_region_{i+1}.tif'
-                divide_tif_into_regions(IMG_DIR / images_namelist[j], regions.iloc[i]['geometry'], new_img_name)
+                divide_tif_into_regions(BASE_DIR / images_namelist[j], regions.iloc[i]['geometry'], new_img_name)
             if i % 2 == 0 and j % 2 == 1:
                 new_img_name = train_folder / f'{images_namelist[j]}_region_{i+1}.tif'
-                divide_tif_into_regions(IMG_DIR / images_namelist[j], regions.iloc[i]['geometry'], new_img_name)
+                divide_tif_into_regions(BASE_DIR / images_namelist[j], regions.iloc[i]['geometry'], new_img_name)
             if i % 2 == 1 and j % 2 == 0:
                 new_img_name = train_folder / f'{images_namelist[j]}_region_{i+1}.tif'
-                divide_tif_into_regions(IMG_DIR / images_namelist[j], regions.iloc[i]['geometry'], new_img_name)
+                divide_tif_into_regions(BASE_DIR / images_namelist[j], regions.iloc[i]['geometry'], new_img_name)
             if i % 2 == 1 and j % 2 == 1:
                 new_img_name = test_folder / f'{images_namelist[j]}_region_{i+1}.tif'
-                divide_tif_into_regions(IMG_DIR / images_namelist[j], regions.iloc[i]['geometry'], new_img_name)
+                divide_tif_into_regions(BASE_DIR / images_namelist[j], regions.iloc[i]['geometry'], new_img_name)
     return None
 
 def plot_image(image_path):
@@ -126,8 +126,8 @@ def generate_label(cropped_img_tiff_path: Path, lake_geom: gp.GeoSeries, out_ima
 
 
 if __name__ == "__main__":
-    if not os.path.exists(IMG_DIR / "test"):
-        os.mkdir(IMG_DIR / "test")
-    if not os.path.exists(IMG_DIR / "train"):
-        os.mkdir(IMG_DIR / "train")
+    if not os.path.exists(BASE_DIR / "test"):
+        os.mkdir(BASE_DIR / "test")
+    if not os.path.exists(BASE_DIR / "train"):
+        os.mkdir(BASE_DIR / "train")
     get_train_test_images()
