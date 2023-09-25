@@ -33,20 +33,19 @@ torch.set_float32_matmul_precision('medium')
 # img_dir can alternatively be '/data1/malto/train' or '/data1/malto/test'
 
 class SigspatialDataset(Dataset):
-    def __init__(self, labels_dataset, img_dir, transform=ToTensor(), target_transform=None):
+    def __init__(self, labels_dataset, img_dir, transform=ToTensor(), target_transform=None ):
         self.img_labels = labels_dataset
         self.img_dir = img_dir
         self.transform = transform
         self.target_transform = target_transform
+        self.images_namelist = sorted([name for name in os.listdir(img_dir) if name.split(".")[-1] == "tif"])
 
     def __len__(self):
         return len(self.img_labels)
 
-    def __getitem__(self, idx, train = True):
-        if train:
-            img_path = f'train_img{idx+1}.tif'
-        else:
-            img_path = f'test_img{idx+1}.tif'
+    def __getitem__(self, idx):
+        
+        img_path = self.images_namelist
         img = rasterio.open(img_path)
         img_array = img.read()
         label = self.img_labels[self.img_labels.Img_number == idx+1]
@@ -107,47 +106,26 @@ class SegmentationModel(pl.LightningModule):
     
 
 class SatelliteDataModule(pl.LightningDataModule):
-    def __init__(self, in_channels: int, transforms: str='default'):
+    def __init__(self,  transforms: str='default'):
         super().__init__()
-        self.in_channels = in_channels
-        self.train_folds = [1]
-        self.val_folds = [0]
+        
         
     def prepare_data(self):
-        # download
-        pass
+        
 
     def setup(self, stage=None):
-        # Assign train/val datasets for use in dataloaders
-        train_post, train_pre, train_masks, _ = get_folds(self.train_folds, self.in_channels)
-        val_post, val_pre, val_masks, _ = get_folds(self.val_folds, self.in_channels)
-
-        if self.in_channels == 12: 
-            train = train_post
-            val = val_post
-        elif self.in_channels == 24: 
-            train = np.concatenate((train_pre, train_post), axis=3)
-            val = np.concatenate((val_pre, val_post), axis=3)
-        elif self.in_channels == 36: 
-            train_diff = train_pre - train_post 
-            train = np.concatenate((train_pre, train_post, train_diff), axis=3)
-            val_diff = val_pre - val_post
-            val = np.concatenate((val_pre, val_post, val_diff), axis=3)
-        else: 
-            raise NotImplementedError
-        
-        self.train_dataset = sigspatialDataset(TensorDataset(np_to_torch(train), np_to_torch(train_masks)))
-        self.val_dataset = sigspatialDataset(TensorDataset(np_to_torch(val), np_to_torch(val_masks)))
+        pass
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS)
+        pass
 
     def val_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS)
+        pass
+        
 
 
 if __name__ == "__main__":
-    in_channels = 24
+    in_channels = 3
     model = SegmentationModel(in_channels=in_channels)
     data = SatelliteDataModule(in_channels=in_channels)
     trainer = pl.Trainer(
