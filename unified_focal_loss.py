@@ -21,6 +21,25 @@ def identify_axis(shape):
     # Exception - Unknown
     else:
         raise ValueError("Metric: Shape of tensor is neither 2D or 3D.")
+    
+class BinaryUnifiedFocalLoss(nn.Module):
+    def init(self, alpha=0.25, gamma=2.0):
+        super(BinaryUnifiedFocalLoss, self).init()
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def forward(self, predicted_masks, true_masks, focal_weights=1):
+        # Calculate binary cross-entropy loss
+        bce_loss = - (self.alpha * true_masks * torch.log(predicted_masks) +
+                        (1 - self.alpha) * (1 - true_masks) * torch.log(1 - predicted_masks))
+
+        # Calculate focal loss
+        focal_loss = focal_weights * (1 - predicted_masks) ** self.gamma * bce_loss
+
+        # Calculate mean loss
+        mean_loss = torch.mean(focal_loss)
+
+        return mean_loss
 
 
 class SymmetricFocalLoss(nn.Module):

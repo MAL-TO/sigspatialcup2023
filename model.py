@@ -20,7 +20,7 @@ import utils
 from lightning.pytorch import Trainer
 import argparse
 from torch.utils.data import DataLoader
-from unified_focal_loss import AsymmetricUnifiedFocalLoss
+from unified_focal_loss import AsymmetricUnifiedFocalLoss, BinaryUnifiedFocalLoss
 
 BASE_DIR = utils.BASE_DIR
 BATCH_SIZE = 32
@@ -62,6 +62,8 @@ class SigspatialDataset(VisionDataset):
         img_tensor = img_tensor.type(torch.float32)
         lbl_tensor = lbl_tensor.type(torch.float32)
 
+        img_tensor = img_tensor * 2 - 1
+
         if self.multi_class:
             fg = lbl_tensor
             bg = torch.where(fg > 0.5, 0, 1)
@@ -92,13 +94,14 @@ class IoU(Metric):
 
 
 class SegmentationModel(pl.LightningModule):
-    def __init__(self, lr=1e-4):
+    def __init__(self, lr=1e-4,  multi_class=True):
         super().__init__()
-        self.segmentation_model = smp.DeepLabV3Plus(activation='sigmoid', classes=2)
+        self.segmentation_model = smp.DeepLabV3Plus(activation='softmax', classes=2)
         self.loss = AsymmetricUnifiedFocalLoss()
         self.learning_rate = lr
         self.train_iou = IoU()
         self.val_iou = IoU()
+        self.multi_class = multi_class
 
     def forward(self, x):
         return self.segmentation_model(x)
@@ -107,7 +110,12 @@ class SegmentationModel(pl.LightningModule):
         x, y = batch
         logits = self(x)
         loss = self.loss(logits, y)
-        self.train_iou.update(logits, y)
+
+        if self.multi_class:
+            self.train_iou.update(torch.argmax(logits, dim=1), torch.argmax(y, dim=1))
+        else:
+            self.train_iou.update(logits, y)
+
         self.log('train_loss', loss, on_step=False, on_epoch=True)
         self.log('train_iou', self.train_iou, on_step=False, on_epoch=True)
         return loss
@@ -116,7 +124,12 @@ class SegmentationModel(pl.LightningModule):
         x, y = batch
         logits = self(x)
         loss = self.loss(logits, y)
-        self.val_iou.update(logits, y)
+
+        if self.multi_class:
+            self.val_iou.update(torch.argmax(logits, dim=1), torch.argmax(y, dim=1))
+        else:
+            self.val_iou.update(logits, y)
+
         self.log('val_loss', loss, on_step=False, on_epoch=True)
         self.log('val_iou', self.val_iou, on_step=False, on_epoch=True)
 
@@ -125,15 +138,16 @@ class SegmentationModel(pl.LightningModule):
     
 
 class SatelliteDataModule(pl.LightningDataModule):
-    def __init__(self, transforms: str='default'):
+    def __init__(self, multi_class=True):
         super().__init__()
+        self.multi_class = multi_class
         
     def prepare_data(self):
         pass
 
     def setup(self, stage=None):
-        self.train_ds = SigspatialDataset(train=True)
-        self.val_ds = SigspatialDataset(train=False)
+        self.train_ds = SigspatialDataset(train=True, multi_class=self.multi_class)
+        self.val_ds = SigspatialDataset(train=False, multi_class=self.multi_class)
 
     def train_dataloader(self):
         return DataLoader(self.train_ds, batch_size=4, drop_last=True, num_workers=NUM_WORKERS, shuffle=True)
@@ -148,8 +162,8 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--epochs")
     args = parser.parse_args()
 
-    model = SegmentationModel(lr=float(args.learning_rate))
-    data = SatelliteDataModule()
+    model = SegmentationModel(lr=float(args.learning_rate), multi_class=True)
+    data = SatelliteDataModule(multi_class=True)
 
     trainer = pl.Trainer(
         accelerator="auto",
