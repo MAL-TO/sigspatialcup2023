@@ -47,12 +47,12 @@ if __name__ == "__main__":
             xmin, xmax = min(xx), max(xx)
             ymin, ymax = min(yy), max(yy)
             
-            step = 224 * CQPP
+            step = (2048-1) * CQPP
             
             thread_list = []
             starting_image_path = DIR / t / full_name 
-            for x in np.arange(xmin, xmax, step / 2):
-                for y in np.arange(ymin, ymax, step / 2):
+            for x in np.arange(xmin, xmax, step):
+                for y in np.arange(ymin, ymax, step):
                     thread_list.append(Thread(target=thread_function, args=(starting_image_path, full_name, t, x, y, step)))
 
             for thread in thread_list:

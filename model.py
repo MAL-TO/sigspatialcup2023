@@ -6,11 +6,9 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader, Dataset
 import numpy as np
 from pytorch_lightning.loggers import CSVLogger
-
 from torchmetrics import Metric
-from torchvision.datasets import VisionDataset, Dataset
+from torchvision.datasets import VisionDataset
 import torch
-
 import os
 import pandas as pd
 from pathlib import Path
@@ -18,10 +16,12 @@ import geopandas as gp
 import numpy as np
 from torchvision.transforms import ToTensor
 import rasterio
-
+import utils
 from lightning.pytorch import Trainer
+import argparse
 from torch.utils.data import DataLoader
 
+BASE_DIR = utils.BASE_DIR
 BATCH_SIZE = 32
 NUM_WORKERS = 16
 torch.set_float32_matmul_precision('medium')
@@ -29,23 +29,24 @@ torch.set_float32_matmul_precision('medium')
 # the label dataset provided should be the one built using get_labels_datasets function in utils.py
 # img_dir can alternatively be '/data1/malto/train' or '/data1/malto/test'
 
-class SigspatialDataset(Dataset):
-    def __init__(self, img_dir: Path, transform=None, target_transform=None):
+class SigspatialDataset(VisionDataset):
+    def __init__(self, train=True, img_dir: Path=BASE_DIR, transform=None, target_transform=None):
         self.img_dir = img_dir
         self.transform = transform
         self.target_transform = target_transform
-        self.names = sorted([name for name in os.listdir(img_dir / "image") if name.split(".")[-1] == "tif"])
+        self.kind = "val" if train else "train"
+        self.names = sorted([name for name in os.listdir(img_dir / f"ds_{self.kind}_images") if name.split(".")[-1] == "tif"])
 
     def __len__(self):
-        return len(self.img_labels)
+        return len(self.names)
 
     def __getitem__(self, idx):
-        img_path = self.img_dir / "image" / self.names[idx]
-        lbl_path = self.img_dir / "label" / self.names[idx]
+        img_path = self.img_dir / f"ds_{self.kind}_images" / self.names[idx]
+        lbl_path = self.img_dir / f"ds_{self.kind}_label" / self.names[idx]
         img = rasterio.open(img_path)
         lbl = rasterio.open(lbl_path)
         img_array = img.read()
-        lbl_array = lbl.read().mean(axis=0)
+        lbl_array = np.expand_dims(lbl.read().mean(axis=0), axis=0)
 
         # transforms
         img_array = np.transpose(img_array, ((1, 2, 0)))
@@ -54,12 +55,16 @@ class SigspatialDataset(Dataset):
         img_tensor = ToTensor()(img_array)
         lbl_tensor = ToTensor()(lbl_array)
 
+        img_tensor = img_tensor.type(torch.float32)
+        lbl_tensor = lbl_tensor.type(torch.float32)
+
         if self.transform is not None:
             img_tensor = self.transform(img_tensor)
         if self.target_transform is not None:
             lbl_tensor = self.target_transform(lbl_tensor)
 
         return img_tensor, lbl_tensor
+
 
 class IoU(Metric):
     def __init__(self):
@@ -78,12 +83,11 @@ class IoU(Metric):
 
 
 class SegmentationModel(pl.LightningModule):
-    def __init__(self, in_channels=3, lr=1e-3):
+    def __init__(self, lr=1e-4):
         super().__init__()
-        self.segmentation_model = smp.DeepLabV3Plus(in_channels=in_channels, activation='sigmoid')
+        self.segmentation_model = smp.DeepLabV3Plus( activation='sigmoid')
         self.loss = nn.BCELoss()
         self.learning_rate = lr
-        self.in_channels = in_channels
         self.train_iou = IoU()
         self.val_iou = IoU()
 
@@ -112,33 +116,35 @@ class SegmentationModel(pl.LightningModule):
     
 
 class SatelliteDataModule(pl.LightningDataModule):
-    def __init__(self,  transforms: str='default'):
+    def __init__(self, transforms: str='default'):
         super().__init__()
-        
         
     def prepare_data(self):
         pass
 
     def setup(self, stage=None):
-        pass
+        self.train_ds = SigspatialDataset(train=True)
+        self.val_ds = SigspatialDataset(train=False)
 
     def train_dataloader(self):
-        pass
+        return DataLoader(self.train_ds, batch_size=4)
 
     def val_dataloader(self):
-        pass
-        
+        return DataLoader(self.val_ds, batch_size=4)
 
 
 if __name__ == "__main__":
-    in_channels = 3
-    model = SegmentationModel(in_channels=in_channels)
-    data = SatelliteDataModule(in_channels=in_channels)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-lr", "--learning_rate")
+    args = parser.parse_args()
+    model = SegmentationModel(lr=args.learning_rate)
+    data = SatelliteDataModule()
     trainer = pl.Trainer(
         accelerator="auto",
         devices=1,
-        max_epochs=30,
-        logger=CSVLogger(save_dir="/data1/chabud/logs/"),
+        max_epochs=50,
+        logger=CSVLogger(save_dir=BASE_DIR / "logs"),
         log_every_n_steps=1
     )
     trainer.fit(model, data)
+    print("---DONE---")
