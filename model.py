@@ -20,6 +20,7 @@ import utils
 from lightning.pytorch import Trainer
 import argparse
 from torch.utils.data import DataLoader
+from unified_focal_loss import AsymmetricUnifiedFocalLoss
 
 BASE_DIR = utils.BASE_DIR
 BATCH_SIZE = 32
@@ -30,11 +31,12 @@ torch.set_float32_matmul_precision('medium')
 # img_dir can alternatively be '/data1/malto/train' or '/data1/malto/test'
 
 class SigspatialDataset(VisionDataset):
-    def __init__(self, train=True, img_dir: Path=BASE_DIR, transform=None, target_transform=None):
+    def __init__(self, train=True, img_dir: Path=BASE_DIR, multi_class=True, transform=None, target_transform=None):
         self.img_dir = img_dir
         self.transform = transform
         self.target_transform = target_transform
-        self.kind = "val" if train else "train"
+        self.multi_class = multi_class
+        self.kind = "train" if train else "val"
         self.names = sorted([name for name in os.listdir(img_dir / f"ds_{self.kind}_images") if name.split(".")[-1] == "tif"])
 
     def __len__(self):
@@ -46,8 +48,8 @@ class SigspatialDataset(VisionDataset):
         img = rasterio.open(img_path)
         lbl = rasterio.open(lbl_path)
         img_array = img.read()
-        lbl_array = np.expand_dims(lbl.read().mean(axis=0), axis=0)
-
+        lbl_array = lbl.read()
+        
         # transforms
         img_array = np.transpose(img_array, ((1, 2, 0)))
         lbl_array = np.transpose(lbl_array, ((1, 2, 0)))
@@ -55,9 +57,16 @@ class SigspatialDataset(VisionDataset):
         img_tensor = ToTensor()(img_array)
         lbl_tensor = ToTensor()(lbl_array)
 
+        lbl_tensor = lbl_tensor.mean(dim=0).unsqueeze(dim=0)
+
         img_tensor = img_tensor.type(torch.float32)
         lbl_tensor = lbl_tensor.type(torch.float32)
 
+        if self.multi_class:
+            fg = lbl_tensor
+            bg = torch.where(fg > 0.5, 0, 1)
+            lbl_tensor = torch.cat((bg, fg), dim=0)
+    
         if self.transform is not None:
             img_tensor = self.transform(img_tensor)
         if self.target_transform is not None:
@@ -85,8 +94,8 @@ class IoU(Metric):
 class SegmentationModel(pl.LightningModule):
     def __init__(self, lr=1e-4):
         super().__init__()
-        self.segmentation_model = smp.DeepLabV3Plus( activation='sigmoid')
-        self.loss = nn.BCELoss()
+        self.segmentation_model = smp.DeepLabV3Plus(activation='sigmoid', classes=2)
+        self.loss = AsymmetricUnifiedFocalLoss()
         self.learning_rate = lr
         self.train_iou = IoU()
         self.val_iou = IoU()
@@ -112,7 +121,7 @@ class SegmentationModel(pl.LightningModule):
         self.log('val_iou', self.val_iou, on_step=False, on_epoch=True)
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        return torch.optim.NAdam(self.parameters(), lr=self.learning_rate)
     
 
 class SatelliteDataModule(pl.LightningDataModule):
@@ -127,24 +136,26 @@ class SatelliteDataModule(pl.LightningDataModule):
         self.val_ds = SigspatialDataset(train=False)
 
     def train_dataloader(self):
-        return DataLoader(self.train_ds, batch_size=4)
+        return DataLoader(self.train_ds, batch_size=4, drop_last=True, num_workers=NUM_WORKERS, shuffle=True)
 
     def val_dataloader(self):
-        return DataLoader(self.val_ds, batch_size=4)
+        return DataLoader(self.val_ds, batch_size=4, drop_last=True, num_workers=NUM_WORKERS)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-lr", "--learning_rate")
+    parser.add_argument("-e", "--epochs")
     args = parser.parse_args()
-    model = SegmentationModel(lr=args.learning_rate)
+
+    model = SegmentationModel(lr=float(args.learning_rate))
     data = SatelliteDataModule()
+    
     trainer = pl.Trainer(
         accelerator="auto",
         devices=1,
-        max_epochs=50,
+        max_epochs=args.epochs,
         logger=CSVLogger(save_dir=BASE_DIR / "logs"),
         log_every_n_steps=1
     )
     trainer.fit(model, data)
-    print("---DONE---")
