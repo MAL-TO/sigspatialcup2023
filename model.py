@@ -150,11 +150,11 @@ if __name__ == "__main__":
 
     model = SegmentationModel(lr=float(args.learning_rate))
     data = SatelliteDataModule()
-    
+
     trainer = pl.Trainer(
         accelerator="auto",
         devices=1,
-        max_epochs=args.epochs,
+        max_epochs=int(args.epochs),
         logger=CSVLogger(save_dir=BASE_DIR / "logs"),
         log_every_n_steps=1
     )
