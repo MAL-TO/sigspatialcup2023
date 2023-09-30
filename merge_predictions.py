@@ -22,7 +22,7 @@ if __name__ == "__main__":
         for region in regions:
             small_images = sorted([name for name in os.listdir(BASE_DIR / "predictions") if name.startswith(big_image) and f"_region_{region}" in name])
             
-            if len(small_images > 1000):
+            if len(small_images) > 1000:
                 # max 2900 so <3000
                 for i in [0, 1000, 2000]:
                     src_to_merge = [rasterio.open(BASE_DIR / "predictions" / small_image) for small_image in small_images[i:i+1000]]
@@ -37,8 +37,10 @@ if __name__ == "__main__":
                                         )
                         if not os.path.exists(BASE_DIR / "big_predictions" / f"{region}" / "part"):
                             os.mkdir(BASE_DIR / "big_predictions" / f"{region}" / "part")
-                        with rasterio.open(BASE_DIR / "big_predictions" / f"{region}" / "part" / f"{i // 1000}" + big_image , "w", **out_meta) as dest:
+                        with rasterio.open(BASE_DIR / "big_predictions" / f"{region}" / "part" / (f"{i // 1000}" + big_image) , "w", **out_meta) as dest:
                             dest.write(mosaic)
+                    for src in src_to_merge:
+                        src.close()
                 partial_images = os.listdir(BASE_DIR / "big_predictions" / f"{region}" / "part")
                 src_to_merge = [rasterio.open(BASE_DIR / "big_predictions" / f"{region}" / "part" / partial_image) for partial_image in partial_images]
                 if len(src_to_merge) > 0:
@@ -65,4 +67,6 @@ if __name__ == "__main__":
                                     )
                     with rasterio.open(BASE_DIR / "big_predictions" / f"{region}" / big_image , "w", **out_meta) as dest:
                         dest.write(mosaic)
+                for src in src_to_merge:
+                        src.close()
             
