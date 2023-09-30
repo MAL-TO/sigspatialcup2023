@@ -11,6 +11,8 @@ import affine
 from rasterio.features import geometry_mask
 import rasterio.mask
 import os
+import cv2
+from shapely import Polygon
 
 BASE_DIR = Path("/data1/malto/sigspatial")
 
@@ -122,6 +124,16 @@ def generate_label(cropped_img_tiff_path: Path, lake_geom: gp.GeoSeries, out_ima
     out_image[out_image != 0] = 255
 
     save_as_tif(out_image, out_transform, img_trial, out_image_path)
+
+def mask_to_polygons(mask_array: np.ndarray):
+    
+    grayscale_image = cv2.cvtColor(mask_array.transpose(1, 2, 0), cv2.COLOR_BGR2GRAY)
+    contours, _ = cv2.findContours(grayscale_image.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Construct the polygons 
+    polygons = [Polygon(c.reshape(-1, 2)) for c in contours if len(c) > 2]
+
+    return polygons
 
 
 
