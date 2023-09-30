@@ -2,6 +2,7 @@ from utils import *
 import pathlib
 from threading import Thread
 
+DIM = 512
 DIR = pathlib.Path("/data1/malto/sigspatial")
 CQPP = 38.2185141426
 
@@ -47,7 +48,7 @@ if __name__ == "__main__":
             xmin, xmax = min(xx), max(xx)
             ymin, ymax = min(yy), max(yy)
             
-            step = (2048-1) * CQPP
+            step = (DIM-1) * CQPP
             
             thread_list = []
             starting_image_path = DIR / t / full_name 
@@ -60,4 +61,6 @@ if __name__ == "__main__":
 
             for thread in thread_list:
                 thread.join()
+
+            print("One Image is done")
 

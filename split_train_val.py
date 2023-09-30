@@ -4,14 +4,14 @@ import utils
 BASE_DIR = utils.BASE_DIR
 
 if __name__ == "__main__":
-    if not os.path.exists(BASE_DIR / "ds_train_images"):
-        os.mkdir(BASE_DIR / "ds_train_images")
-    if not os.path.exists(BASE_DIR / "ds_train_label"):
-        os.mkdir(BASE_DIR / "ds_train_label")
-    if not os.path.exists(BASE_DIR / "ds_val_images" ):
-        os.mkdir(BASE_DIR / "ds_val_images" )
-    if not os.path.exists(BASE_DIR / "ds_val_label"):
-        os.mkdir(BASE_DIR / "ds_val_label")
+    dirs = [BASE_DIR / "ds_train_images", BASE_DIR / "ds_train_label", BASE_DIR / "ds_val_images", BASE_DIR / "ds_val_label"]
+
+    for dir in dirs:
+        if not os.path.exists(dir):
+            os.mkdir(dir)
+        else:
+            for f in os.listdir(dir):
+                os.remove(dir / f)
     
     originating_images = sorted([name for name in os.listdir(BASE_DIR / "train") if name.split(".")[-1] == "tif"])
     train_images = originating_images[:9]

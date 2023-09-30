@@ -14,16 +14,17 @@ import pandas as pd
 from pathlib import Path
 import geopandas as gp
 import numpy as np
-from torchvision.transforms import ToTensor
+from torchvision.transforms import ToTensor, Compose, RandomHorizontalFlip, RandomRotation, GaussianBlur, ElasticTransform
 import rasterio
 import utils
 from lightning.pytorch import Trainer
 import argparse
 from torch.utils.data import DataLoader
-from unified_focal_loss import AsymmetricUnifiedFocalLoss, BinaryUnifiedFocalLoss
+import cv2
+from unified_focal_loss import AsymmetricUnifiedFocalLoss
 
 BASE_DIR = utils.BASE_DIR
-BATCH_SIZE = 32
+BATCH_SIZE = 80
 NUM_WORKERS = 16
 torch.set_float32_matmul_precision('medium')
 
@@ -31,10 +32,9 @@ torch.set_float32_matmul_precision('medium')
 # img_dir can alternatively be '/data1/malto/train' or '/data1/malto/test'
 
 class SigspatialDataset(VisionDataset):
-    def __init__(self, train=True, img_dir: Path=BASE_DIR, multi_class=True, transform=None, target_transform=None):
+    def __init__(self, train=True, img_dir: Path=BASE_DIR, multi_class=True, aug=False):
         self.img_dir = img_dir
-        self.transform = transform
-        self.target_transform = target_transform
+        self.aug = aug
         self.multi_class = multi_class
         self.kind = "train" if train else "val"
         self.names = sorted([name for name in os.listdir(img_dir / f"ds_{self.kind}_images") if name.split(".")[-1] == "tif"])
@@ -54,6 +54,18 @@ class SigspatialDataset(VisionDataset):
         img_array = np.transpose(img_array, ((1, 2, 0)))
         lbl_array = np.transpose(lbl_array, ((1, 2, 0)))
 
+        img_array = cv2.resize(img_array, dsize=(512, 512))
+        lbl_array = cv2.resize(lbl_array, dsize=(512, 512))
+
+        if self.kind == "train" and self.aug == True:
+            glob_array = np.vstack((img_array, lbl_array))
+            transform = Compose([
+                RandomHorizontalFlip(),
+                RandomRotation(degrees=(0, 20, 30, 60, 80, 90, 100, 105, 150, 180, 200, 270, 345, 350)),
+            ])
+            glob_array = transform(glob_array)
+            img_array, lbl_array = np.vsplit(glob_array, 2)
+        
         img_tensor = ToTensor()(img_array)
         lbl_tensor = ToTensor()(lbl_array)
 
@@ -68,11 +80,6 @@ class SigspatialDataset(VisionDataset):
             fg = lbl_tensor
             bg = torch.where(fg > 0.5, 0, 1)
             lbl_tensor = torch.cat((bg, fg), dim=0)
-    
-        if self.transform is not None:
-            img_tensor = self.transform(img_tensor)
-        if self.target_transform is not None:
-            lbl_tensor = self.target_transform(lbl_tensor)
 
         return img_tensor, lbl_tensor
 
@@ -96,7 +103,7 @@ class IoU(Metric):
 class SegmentationModel(pl.LightningModule):
     def __init__(self, lr=1e-4,  multi_class=True):
         super().__init__()
-        self.segmentation_model = smp.DeepLabV3Plus(activation='softmax', classes=2)
+        self.segmentation_model = smp.DeepLabV3Plus(encoder_name="resnet18", activation='softmax', classes=2)
         self.loss = AsymmetricUnifiedFocalLoss()
         self.learning_rate = lr
         self.train_iou = IoU()
@@ -138,10 +145,11 @@ class SegmentationModel(pl.LightningModule):
     
 
 class SatelliteDataModule(pl.LightningDataModule):
-    def __init__(self, multi_class=True):
+    def __init__(self, multi_class=True, aug=False):
         super().__init__()
         self.multi_class = multi_class
-        
+        self.aug = aug
+
     def prepare_data(self):
         pass
 
@@ -150,10 +158,10 @@ class SatelliteDataModule(pl.LightningDataModule):
         self.val_ds = SigspatialDataset(train=False, multi_class=self.multi_class)
 
     def train_dataloader(self):
-        return DataLoader(self.train_ds, batch_size=4, drop_last=True, num_workers=NUM_WORKERS, shuffle=True)
+        return DataLoader(self.train_ds, batch_size=BATCH_SIZE, drop_last=True, num_workers=NUM_WORKERS, shuffle=True)
 
     def val_dataloader(self):
-        return DataLoader(self.val_ds, batch_size=4, drop_last=True, num_workers=NUM_WORKERS)
+        return DataLoader(self.val_ds, batch_size=2*BATCH_SIZE, drop_last=True, num_workers=NUM_WORKERS)
 
 
 if __name__ == "__main__":
@@ -163,7 +171,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     model = SegmentationModel(lr=float(args.learning_rate), multi_class=True)
-    data = SatelliteDataModule(multi_class=True)
+    data = SatelliteDataModule(multi_class=True,aug=True)
 
     trainer = pl.Trainer(
         accelerator="auto",
