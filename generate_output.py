@@ -22,13 +22,15 @@ if __name__ == "__main__":
 
     for region in regions:
         for mask_path in os.listdir(BASE_DIR / "big_predictions" / region):
-            whole_mask_path = BASE_DIR / "big_predictions" / region / mask_path
-            mask = rasterio.open(whole_mask_path)
-            polygons_list = utils.mask_to_polygons(mask)
-            for polygon in polygons_list:
-                new_row = {'image': mask_path,'region_num': region, 'geometry': polygon}
-                gdf.loc[len(gdf)] = new_row 
-            gdf.set_crs(3857)
+            if 'part' not in mask_path:
+                whole_mask_path = BASE_DIR / "big_predictions" / region / mask_path
+                mask = rasterio.open(whole_mask_path)
+                polygons_list = utils.mask_to_polygons(mask)
+                for polygon in polygons_list:
+                    new_row = {'image': mask_path,'region_num': region, 'geometry': polygon}
+                    gdf.loc[len(gdf)] = new_row 
+                mask.close()
+                gdf.set_crs(3857)
 
     # Filter small lakes
     areas = gdf.area
