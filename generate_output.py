@@ -7,18 +7,13 @@ import pandas as pd
 
 BASE_DIR = utils.BASE_DIR
 
-def compute_polygons_area(gdf):
-    gdf_mercador = gdf.to_crs(epsg=3857)
-    return gdf_mercador.area
-
-if __name__ == "__main__":
+def generate_output():
     # Create empty dataFrame
     column_names = ["image", "region_num", "geometry"]
     # column_names = [str , numpy.int64, shapely.geometry.polygon.Polygon]
     gdf = gp.GeoDataFrame(columns = column_names)
 
     regions = sorted([name for name in os.listdir(BASE_DIR / "big_predictions")])
-
 
     for region in regions:
         for mask_path in os.listdir(BASE_DIR / "big_predictions" / region):
@@ -40,3 +35,6 @@ if __name__ == "__main__":
     
 
     gdf_filt.to_file('lake_polygons_test.gpkg', driver='GPKG') 
+
+if __name__ == "__main__":
+    generate_output()

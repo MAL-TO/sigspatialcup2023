@@ -12,11 +12,11 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 BASE_DIR = utils.BASE_DIR
-LOGS_DIR = "/data1/malto/sigspatial/logs"
+LOGS_DIR = BASE_DIR / "logs"
 
-if __name__ == "__main__":
+def generate_predictions():
     if not os.path.exists(BASE_DIR / "predictions"):
-            os.mkdir(BASE_DIR / "predictions")
+        os.mkdir(BASE_DIR / "predictions")
 
     last_version = max([int(s.replace("version_", "")) for s in os.listdir(f"{LOGS_DIR}/lightning_logs")])
     checkpoint_folder = Path(f"{LOGS_DIR}/lightning_logs/version_{last_version}/checkpoints")
@@ -50,3 +50,6 @@ if __name__ == "__main__":
         # Save the clipped image to a new .tif file
         with rasterio.open(BASE_DIR / "predictions" / test_image, "w", **out_meta) as dest:
             dest.write(pred_img)
+
+if __name__ == "__main__":
+    generate_predictions()

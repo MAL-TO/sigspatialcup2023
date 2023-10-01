@@ -8,7 +8,7 @@ import utils
 
 BASE_DIR = utils.BASE_DIR
 
-if __name__ == "__main__":
+def merge_predictions():
     if not os.path.exists(BASE_DIR / "big_predictions"):
             os.mkdir(BASE_DIR / "big_predictions")
 
@@ -70,3 +70,6 @@ if __name__ == "__main__":
                 for src in src_to_merge:
                         src.close()
             
+
+if __name__ == "__main__":
+    merge_predictions()

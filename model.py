@@ -163,6 +163,19 @@ class SatelliteDataModule(pl.LightningDataModule):
     def val_dataloader(self):
         return DataLoader(self.val_ds, batch_size=2*BATCH_SIZE, drop_last=True, num_workers=NUM_WORKERS)
 
+def allena_modello(lr, epochs):
+    model = SegmentationModel(lr=lr, multi_class=True)
+    data = SatelliteDataModule(multi_class=True,aug=True)
+
+    trainer = pl.Trainer(
+        accelerator="auto",
+        devices=1,
+        max_epochs=epochs,
+        logger=CSVLogger(save_dir=BASE_DIR / "logs"),
+        log_every_n_steps=1
+    )
+    trainer.fit(model, data)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -170,14 +183,5 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--epochs")
     args = parser.parse_args()
 
-    model = SegmentationModel(lr=float(args.learning_rate), multi_class=True)
-    data = SatelliteDataModule(multi_class=True,aug=True)
-
-    trainer = pl.Trainer(
-        accelerator="auto",
-        devices=1,
-        max_epochs=int(args.epochs),
-        logger=CSVLogger(save_dir=BASE_DIR / "logs"),
-        log_every_n_steps=1
-    )
-    trainer.fit(model, data)
+    allena_modello(float(args.learning_rate), int(args.epochs))
+    

@@ -3,21 +3,17 @@ import pathlib
 from threading import Thread
 
 DIM = 512
-DIR = pathlib.Path("/data1/malto/sigspatial")
+DIR = BASE_DIR
 CQPP = 38.2185141426
 
-def thread_function(starting_image_path, full_name, t, x, y, step):
+def thread_function(starting_image_path, full_name, t, x, y, step, lake_geom):
     image_path = DIR / (t + "_image") / (full_name + f"_{x}_{y}.tif")
     label_path = DIR / (t + "_label") / (full_name + f"_{x}_{y}.tif")
-    src = rasterio.open(starting_image_path)
-            #print(x, y, src.read().shape, src.bounds, src.bounds)
-            #print(lake_geom)
     generate_image(starting_image_path, get_square(x, y, step), image_path) 
     if t != "test":
         generate_label(image_path, lake_geom, label_path)
 
-if __name__ == "__main__":
-   
+def generate_dataset():
     if not os.path.exists(DIR / "train_image"):
         os.mkdir(DIR / "train_image")
     if not os.path.exists(DIR / "train_label"):
@@ -52,9 +48,9 @@ if __name__ == "__main__":
             
             thread_list = []
             starting_image_path = DIR / t / full_name 
-            for x in np.arange(xmin, xmax, step):
-                for y in np.arange(ymin, ymax, step):
-                    thread_list.append(Thread(target=thread_function, args=(starting_image_path, full_name, t, x, y, step)))
+            for x in np.arange(xmin, xmax, step / 2):
+                for y in np.arange(ymin, ymax, step / 2):
+                    thread_list.append(Thread(target=thread_function, args=(starting_image_path, full_name, t, x, y, step, lake_geom)))
 
             for thread in thread_list:
                 thread.start()
@@ -62,5 +58,5 @@ if __name__ == "__main__":
             for thread in thread_list:
                 thread.join()
 
-            print("One Image is done")
-
+if __name__ == "__main__":
+    generate_dataset()

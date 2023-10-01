@@ -3,7 +3,7 @@ import utils
 
 BASE_DIR = utils.BASE_DIR
 
-if __name__ == "__main__":
+def split_train_val():
     dirs = [BASE_DIR / "ds_train_images", BASE_DIR / "ds_train_label", BASE_DIR / "ds_val_images", BASE_DIR / "ds_val_label"]
 
     for dir in dirs:
@@ -29,3 +29,6 @@ if __name__ == "__main__":
                 os.rename(BASE_DIR / "train_image" / small_image, BASE_DIR / "ds_val_images" / small_image)
                 os.rename(BASE_DIR / "train_label" / small_image, BASE_DIR / "ds_val_label" / small_image)
                 
+
+if __name__ == "__main__":
+    split_train_val()
