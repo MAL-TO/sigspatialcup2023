@@ -3,6 +3,8 @@
 ## General description
 This repository includes the code that automates the detection of surface lakes on the Greenland ice sheet using satellite imagery. The goal is to identify and tag these lakes as polygons, in order to monitor the behavior of these lakes across multiple summer melt seasons.
 
+## How to run the project
+
 ## Solution description
 ### Dataset
 We have employed the set of four large multi-part satellite images given by challenge organizers.
@@ -20,6 +22,9 @@ Polygons with area greater than 100 000 m^2 have not been considered.
 ### Predictive method
 Since model takes as input 512x512 images, test images have been splitted using a sliding window as the previously explained procedure for training images.
 Then predictions masks related to the same region and time period have been merged together to obtain teh final output.
+
+### Credits
+@RicoBorra @ClaudioSavelli @juliette23
 
 
 
