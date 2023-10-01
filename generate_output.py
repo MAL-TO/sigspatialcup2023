@@ -7,6 +7,10 @@ import pandas as pd
 
 BASE_DIR = utils.BASE_DIR
 
+def compute_polygons_area(gdf):
+    gdf_mercador = gdf.to_crs(epsg=3857)
+    return gdf_mercador.area
+
 if __name__ == "__main__":
     # Create empty dataFrame
     column_names = ["image", "region_num", "geometry"]
@@ -20,12 +24,17 @@ if __name__ == "__main__":
         for mask_path in os.listdir(BASE_DIR / "big_predictions" / region):
             whole_mask_path = BASE_DIR / "big_predictions" / region / mask_path
             mask = rasterio.open(whole_mask_path)
-            mask_array = mask.read()
-            polygons_list = utils.mask_to_polygons(mask_array)
+            polygons_list = utils.mask_to_polygons(mask)
             for polygon in polygons_list:
                 new_row = {'image': mask_path,'region_num': region, 'geometry': polygon}
-                gdf.loc[len(gdf)] = new_row   
-    gdf.set_geometry('geometry', drop=False, inplace=True, crs="EPSG:4326") 
+                gdf.loc[len(gdf)] = new_row 
+            gdf.set_crs(3857)
 
-            
-    gdf.to_file('lake_polygons_test.gpkg', driver='GPKG') 
+    # Filter small lakes
+    areas = gdf.area
+    gdf['Area'] = areas
+    gdf_filt = gdf[gdf['Area']>= 100000]
+    gdf_filt.drop('Area', inplace=True, axis=1)
+    
+
+    gdf_filt.to_file('lake_polygons_test.gpkg', driver='GPKG') 
