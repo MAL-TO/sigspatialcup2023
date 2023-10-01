@@ -24,7 +24,9 @@ Since model takes as input 512x512 images, test images have been splitted using 
 Then predictions masks related to the same region and time period have been merged together to obtain teh final output.
 
 ### Credits
-@RicoBorra @ClaudioSavelli @juliette23
+[Federico Borra](https://github.com/RicoBorra)
+[Claudio Savelli](https://github.com/ClaudioSavelli)
+[Giulia Monchietto](https://github.com/juliette23)
 
 
 
