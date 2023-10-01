@@ -23,6 +23,9 @@ Polygons with area greater than 100 000 m^2 have not been considered.
 Since model takes as input 512x512 images, test images have been splitted using a sliding window as the previously explained procedure for training images.
 Then predictions masks related to the same region and time period have been merged together to obtain teh final output.
 
+## Files description
+
+
 ### Credits
 [Federico Borra](https://github.com/RicoBorra), 
 [Claudio Savelli](https://github.com/ClaudioSavelli), 
