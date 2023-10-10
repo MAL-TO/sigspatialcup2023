@@ -130,8 +130,8 @@ def mask_to_polygons(mask):
     transformer = rasterio.transform.AffineTransformer(mask.transform)
     mask_array = mask.read()
     grayscale_image = cv2.cvtColor(mask_array.transpose(1, 2, 0), cv2.COLOR_BGR2GRAY)
-    grayscale_image = cv2.flip(grayscale_image, 0)
-    grayscale_image = cv2.flip(grayscale_image, 1)
+    #grayscale_image = cv2.flip(grayscale_image, 0)
+    #grayscale_image = cv2.flip(grayscale_image, 1)
 
     contours, _ = cv2.findContours(grayscale_image.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
