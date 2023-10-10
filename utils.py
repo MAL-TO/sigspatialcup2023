@@ -132,7 +132,7 @@ def mask_to_polygons(mask):
     grayscale_image = cv2.cvtColor(mask_array.transpose(1, 2, 0), cv2.COLOR_BGR2GRAY)
     grayscale_image = cv2.flip(grayscale_image, 0)
     grayscale_image = cv2.flip(grayscale_image, 1)
-    
+
     contours, _ = cv2.findContours(grayscale_image.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     # Construct the polygons 
@@ -141,8 +141,8 @@ def mask_to_polygons(mask):
         c = c.reshape(-1,2)
         new_poly = []
         for point in c:
-            x = point[0]
-            y = point[1]
+            y = point[0]
+            x = point[1]
             new_poly.append(transformer.xy(x, y))
         if len(new_poly) > 2:
             polygons.append(shapely.Polygon(new_poly))
