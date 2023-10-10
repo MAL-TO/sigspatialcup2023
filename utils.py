@@ -14,7 +14,7 @@ import os
 import cv2
 from shapely import Polygon
 
-BASE_DIR = Path(os.getcwd())
+BASE_DIR = Path('/data1/malto/sigspatial')
 
 def get_train_test_images():
     images_namelist = sorted([name for name in os.listdir(BASE_DIR) if name.split(".")[-1] == "tif"])
@@ -138,8 +138,8 @@ def mask_to_polygons(mask):
         c = c.reshape(-1,2)
         new_poly = []
         for point in c:
-            x = point[0]
-            y = point[1]
+            y = point[0]
+            x = point[1]
             new_poly.append(transformer.xy(x, y))
         if len(new_poly) > 2:
             polygons.append(shapely.Polygon(new_poly))
