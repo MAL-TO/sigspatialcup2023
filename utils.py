@@ -138,8 +138,8 @@ def mask_to_polygons(mask):
         c = c.reshape(-1,2)
         new_poly = []
         for point in c:
-            y = point[0]
-            x = point[1]
+            x = point[0]
+            y = point[1]
             new_poly.append(transformer.xy(x, y))
         if len(new_poly) > 2:
             polygons.append(shapely.Polygon(new_poly))

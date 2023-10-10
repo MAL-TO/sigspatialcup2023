@@ -25,7 +25,7 @@ def generate_output():
                     new_row = {'image': mask_path,'region_num': region, 'geometry': polygon}
                     gdf.loc[len(gdf)] = new_row 
                 mask.close()
-                gdf.set_crs(3857)
+                gdf = gdf.set_crs(3857)
 
     # Filter small lakes
     areas = gdf.area
