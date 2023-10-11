@@ -14,7 +14,7 @@ import os
 import cv2
 from shapely import Polygon
 
-BASE_DIR = Path("/data1/malto/sigspatial")
+BASE_DIR = Path(os.getcwd())
 
 def get_train_test_images():
     images_namelist = sorted([name for name in os.listdir(BASE_DIR) if name.split(".")[-1] == "tif"])
